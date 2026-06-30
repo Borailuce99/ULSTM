@@ -1,13 +1,13 @@
-# ULSTM — U-Net + ConvLSTM para Detección de Anomalías en Video
+# ULSTM — U-Net + ConvLSTM for Video Anomaly Detection
 
-Implementación de una arquitectura **U-Net con ConvLSTM** para predicción de fotogramas y detección de anomalías en secuencias de video, basada en el paper [*Convolutional LSTM Network: A Machine Learning Approach for Precipitation Nowcasting*](https://arxiv.org/pdf/1805.11247).
+Implementation of a **U-Net with ConvLSTM** architecture for frame prediction and anomaly detection in video sequences, based on the paper [*Convolutional LSTM Network: A Machine Learning Approach for Precipitation Nowcasting*](https://arxiv.org/pdf/1805.11247).
 
-## Arquitectura
+## Architecture
 
-**ULSTM** combina una U-Net con capas ConvLSTM en los skip connections del encoder:
+**ULSTM** combines a U-Net with ConvLSTM layers in the encoder skip connections:
 
 ```
-Entrada: [B, T, 3, H, W]  (T = 5 fotogramas)
+Input: [B, T, 3, H, W]  (T = 5 frames)
   │
   ├─ Encoder (DownSample × 4)
   │   ├─ ConvLSTM → GroupNorm → Conv2D → Skip-connection
@@ -16,52 +16,52 @@ Entrada: [B, T, 3, H, W]  (T = 5 fotogramas)
   ├─ Bottleneck (DoubleConv 512 → 1024)
   │
   ├─ Decoder (UpSample × 4)
-  │   ├─ Upsampling bilineal
+  │   ├─ Bilinear upsampling
   │   ├─ Skip-connection + ConvLSTM
   │   └─ DoubleConv
   │
-  └─ Salida: Conv2D(64 → 3) + Sigmoid → [B, T, 3, H, W]
+  └─ Output: Conv2D(64 → 3) + Sigmoid → [B, T, 3, H, W]
 ```
 
-### Componentes
+### Components
 
-| Módulo | Descripción |
+| Module | Description |
 |--------|-------------|
-| `ConvLSTMCell` | Celda ConvLSTM con compuertas (input, forget, output) y conexiones peephole |
-| `ConvLSTM` | Capa ConvLSTM que procesa la secuencia temporal paso a paso |
+| `ConvLSTMCell` | ConvLSTM cell with input/forget/output gates and peephole connections |
+| `ConvLSTM` | ConvLSTM layer processing the temporal sequence step by step |
 | `DownSample` | ConvLSTM + GroupNorm + Conv2D + downsampling (stride 2) |
-| `UpSample` | Upsampling bilineal + skip + ConvLSTM + DoubleConv |
-| `DoubleConv` | Dos convoluciones 3×3 con GroupNorm y LeakyReLU |
+| `UpSample` | Bilinear upsampling + skip + ConvLSTM + DoubleConv |
+| `DoubleConv` | Two 3×3 convolutions with GroupNorm and LeakyReLU |
 
-## Estructura del proyecto
+## Project structure
 
 ```
-├── config.py                    # Configuración (rutas, hiperparámetros)
-├── train.py                     # Entrenamiento con validación y test
-├── inferenceAnomaly_ULSTM.py    # Inferencia en secuencias con anomalías
-├── inferenceNormal_ULSTM.py     # Inferencia en secuencias normales
-├── Dockerfile                   # Imagen Docker con CUDA 12.9 + PyTorch
-├── docker-compose.yml           # Orquestación del contenedor
+├── config.py                    # Configuration (paths, hyperparameters)
+├── train.py                     # Training with validation and test splits
+├── inferenceAnomaly_ULSTM.py    # Inference on anomaly sequences
+├── inferenceNormal_ULSTM.py     # Inference on normal sequences
+├── Dockerfile                   # Docker image with CUDA 12.9 + PyTorch
+├── docker-compose.yml           # Container orchestration
 ├── utils/
 │   ├── __init__.py
-│   ├── ConvLSTMCell.py          # Celda ConvLSTM
-│   ├── ConvLSTM.py              # Capa ConvLSTM
-│   └── ULSTM_Definitions.py     # Modelo ULSTM, Dataset, utilidades
+│   ├── ConvLSTMCell.py          # ConvLSTM cell
+│   ├── ConvLSTM.py              # ConvLSTM layer
+│   └── ULSTM_Definitions.py     # ULSTM model, Dataset, utilities
 └── .gitignore
 ```
 
-## Requisitos
+## Requirements
 
-- **GPU NVIDIA** con soporte CUDA 12.9
-- **Docker** con `nvidia-container-toolkit`
+- **NVIDIA GPU** with CUDA 12.9 support
+- **Docker** with `nvidia-container-toolkit`
 
-## Configuración
+## Setup
 
-Edita `config.py`:
+Edit `config.py`:
 
 ```python
-DATASET = "/ruta/al/dataset.csv"       # CSV con rutas a imágenes
-INF_DATASET = "/ruta/al/inferencia.csv"
+DATASET = "/path/to/dataset.csv"       # CSV with image paths
+INF_DATASET = "/path/to/inference.csv"
 cuda_device = "cuda:0"
 num_epochs = 1000
 batch_size = 2
@@ -69,65 +69,65 @@ lr = 1e-4
 img_size = 256
 ```
 
-### Formato del CSV
+### CSV format
 
-El CSV debe tener las columnas:
-- `input_frames`: lista de rutas a los T fotogramas de entrada
-- `output_frames`: lista de rutas a los T fotogramas objetivo
-- `anomaly`: bandera de anomalía (0/1)
+The CSV must include the following columns:
+- `input_frames`: list of paths to the T input frames
+- `output_frames`: list of paths to the T target frames
+- `anomaly`: anomaly flag (0/1)
 
-## Uso con Docker
+## Usage with Docker
 
 ```bash
-# Crear archivo .env
+# Create .env file
 echo "USER_ID=$(id -u)
 USER_NAME=$(whoami)
 GROUP_ID=$(id -g)
 GROUP_NAME=$(id -gn)" > .env
 
-# Construir y ejecutar
+# Build and run
 docker compose up -d
 
-# Entrar al contenedor
+# Enter the container
 docker exec -it ulstm_borja bash
 
-# Entrenar
+# Train
 python train.py
 
-# Inferencia
+# Inference
 python inferenceAnomaly_ULSTM.py
 python inferenceNormal_ULSTM.py
 ```
 
-## Entrenamiento
+## Training
 
-`train.py` realiza:
-- Split 80/10/10 (train/val/test) del dataset
-- Optimizador AdamW con LR scheduler (ReduceLROnPlateau)
+`train.py` performs:
+- 80/10/10 train/val/test split
+- AdamW optimizer with ReduceLROnPlateau scheduler
 - Loss: SmoothL1Loss
-- Mixed precision (AMP) para RTX 50
-- Clipping de gradientes (max_norm=1.0)
-- Guardado del mejor modelo en `models/best_model`
-- Visualización de predicciones cada época
-- Feature maps del bottleneck cada época
+- Mixed precision (AMP) for RTX 50 series
+- Gradient clipping (max_norm=1.0)
+- Best model saved to `models/best_model`
+- Prediction visualization every epoch
+- Bottleneck feature maps every epoch
 
-## Inferencia
+## Inference
 
 ### `inferenceAnomaly_ULSTM.py`
-- Calcula **PSNR**, **SSIM** y **LPIPS** por secuencia
-- Guarda hidden states de ConvLSTM como grids y heatmaps overlay
-- Exporta resultados a CSV
+- Computes **PSNR**, **SSIM** and **LPIPS** per sequence
+- Saves ConvLSTM hidden states as grids and overlay heatmaps
+- Exports results to CSV
 
 ### `inferenceNormal_ULSTM.py`
-- Similar al de anomalías pero filtra secuencias anómalas
-- Agrupa subsecuencias normales consecutivas
+- Similar to anomaly script but filters out anomalous sequences
+- Groups consecutive normal subsequences
 
-## Métricas
+## Metrics
 
 - **PSNR** (Peak Signal-to-Noise Ratio)
 - **SSIM** (Structural Similarity Index)
-- **LPIPS** (Learned Perceptual Image Patch Similarity) — solo anomalías
+- **LPIPS** (Learned Perceptual Image Patch Similarity) — anomaly only
 
-## Licencia
+## License
 
-Proyecto académico.
+Academic project.
