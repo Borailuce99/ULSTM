@@ -1,6 +1,6 @@
 # ULSTM — U-Net + ConvLSTM for Video Anomaly Detection
 
-Implementation of a **U-Net with ConvLSTM** architecture for frame prediction and anomaly detection in video sequences, based on the paper [*Convolutional LSTM Network: A Machine Learning Approach for Precipitation Nowcasting*](https://arxiv.org/pdf/1805.11247).
+Implementation of a **U-Net with ConvLSTM** architecture for frame prediction and anomaly detection in video sequences, based on the paper ????.
 
 ## Architecture
 
